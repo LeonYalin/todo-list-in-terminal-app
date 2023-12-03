@@ -1,5 +1,5 @@
 import { Todo } from "../models/todo";
-import { Interface } from "readline/promises";
+import { Interface, createInterface } from "readline/promises";
 import { TodoOption } from "../types/todoTypes";
 import {
   greenText,
@@ -8,9 +8,14 @@ import {
   todoText,
   yellowText,
 } from "../utils/colorUtil";
-import { promptUser } from "../utils/todoUtils";
+import { abortPrompt, promptUser } from "../utils/todoUtils";
+import { Server } from "socket.io";
+import { EventType, TodoMsg } from "../types/socketEvents";
 
-class TodoManager {
+const TODO_CHANNEL = "todo_msg";
+
+export class TodoManager {
+  private rl: Interface;
   private todos: Todo[] = [];
   private welcomeOptions: TodoOption[] = [
     {
@@ -48,29 +53,67 @@ class TodoManager {
     },
   ];
 
-  constructor(private rl: Interface) {}
+  constructor(private io: Server) {
+    this.io.on("connection", (socket) => {
+      console.log("a user connected");
+      this.start();
 
-  run() {
+      socket.on("disconnect", () => {
+        console.log("user disconnected");
+        this.end();
+      });
+
+      socket.on(TODO_CHANNEL, (msg: TodoMsg) => {
+        console.log("server__todo_msg:", msg);
+
+        this.redirectTo(msg);
+      });
+    });
+
+    this.rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+  }
+
+  private start() {
     this.welcomeDialog();
   }
 
+  private write(text: string, type: EventType = EventType.UNDEFINED) {
+    this.rl.write(text);
+    this.io.emit(TODO_CHANNEL, { type, text });
+  }
+
+  private redirectTo(msg: TodoMsg) {
+    switch (msg.type) {
+      case EventType.WELCOME_CHOOSE_OPTION:
+        this.welcomeDialogOptionChosen(msg.text);
+    }
+  }
+
   private exitDialog() {
-    this.rl.write(yellowText("Exiting.. Bye!\n\n"));
+    this.write(yellowText("Exiting.. Bye!\n\n"));
+    this.end();
+  }
+
+  private end() {
+    abortPrompt();
     this.rl.close();
     this.rl.removeAllListeners();
-    process.exit();
   }
 
   private async welcomeDialog() {
-    this.rl.write(
+    this.write(
       `\n${yellowText("Hello")} and welcome to my ${redText(
         "TODO List"
       )} app!\n\n`
     );
 
     this.welcomeOptions.forEach((option, i) => {
-      this.rl.write(`${optionText(option.key, option.text)}\n`);
+      this.write(`${optionText(option.key, option.text)}\n`);
     });
+    this.write("", EventType.WELCOME_CHOOSE_OPTION);
 
     const answer = await promptUser(this.rl, {
       isValidWhen: (answer: string) =>
@@ -81,18 +124,22 @@ class TodoManager {
     chosenOption?.handler();
   }
 
+  private welcomeDialogOptionChosen(msg: string) {
+    // this.write()
+  }
+
   private async viewAllTodosDialog() {
-    this.rl.write(`${yellowText("\nAvailiable todos:")}\n\n`);
+    this.write(`${yellowText("\nAvailiable todos:")}\n\n`);
 
     if (this.todos.length === 0) {
-      this.rl.write("No todos found.\n\n");
+      this.write("No todos found.\n\n");
     } else {
       this.todos.forEach((todo, index) => {
-        this.rl.write(`${todoText(index + 1, todo)}\n`);
+        this.write(`${todoText(index + 1, todo)}\n`);
       });
     }
 
-    this.rl.write(`${optionText("0", "Go back")}\n`);
+    this.write(`${optionText("0", "Go back")}\n`);
 
     const answer = await promptUser(this.rl, {
       isValidWhen: (answer: string) =>
@@ -111,13 +158,13 @@ class TodoManager {
   }
 
   private async editTodoDialog(todo: Todo) {
-    this.rl.write(`\n${yellowText("Selected:")} ${todoText(null, todo)}\n\n`);
+    this.write(`\n${yellowText("Selected:")} ${todoText(null, todo)}\n\n`);
 
     this.editTodoOptions.forEach((option, i) => {
-      this.rl.write(`${optionText(option.key, option.text)}\n`);
+      this.write(`${optionText(option.key, option.text)}\n`);
     });
 
-    this.rl.write(`${optionText("0", "Go back")}\n`);
+    this.write(`${optionText("0", "Go back")}\n`);
 
     const answer = await promptUser(this.rl, {
       isValidWhen: (answer: string) =>
@@ -151,7 +198,7 @@ class TodoManager {
       if (index > -1) {
         this.todos.splice(index, 1);
       }
-      this.rl.write(`\n${greenText("Todo successfully deleted!")}\n\n`);
+      this.write(`\n${greenText("Todo successfully deleted!")}\n\n`);
       this.viewAllTodosDialog();
     } else {
       this.editTodoDialog(todo);
@@ -179,7 +226,7 @@ class TodoManager {
       if (index > -1) {
         this.todos[index].completed = nextCompleted;
       }
-      this.rl.write(
+      this.write(
         `\n${greenText(
           "Todo successfully marked as"
         )} ${nextCompletedText}!)}\n\n`
@@ -204,7 +251,7 @@ class TodoManager {
       this.todos[index].description = answer;
     }
 
-    this.rl.write(`\n${greenText("Description successfully updated")}!)}\n\n`);
+    this.write(`\n${greenText("Description successfully updated")}!)}\n\n`);
     this.viewAllTodosDialog();
   }
 
@@ -216,11 +263,11 @@ class TodoManager {
     });
 
     this.todos.push(new Todo(answer, false));
-    this.rl.write(greenText("\nTodo successfully added!\n"));
+    this.write(greenText("\nTodo successfully added!\n"));
     this.welcomeDialog();
   }
 }
 
-export function newTodoManager(rl: Interface) {
-  return new TodoManager(rl);
+export function newTodoManager(io: Server) {
+  return new TodoManager(io);
 }

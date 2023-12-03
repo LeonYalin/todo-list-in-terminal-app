@@ -1,5 +1,7 @@
 import { Interface } from "readline/promises";
 
+const aborter = new AbortController();
+
 export async function promptUser(
   rl: Interface,
   {
@@ -14,10 +16,18 @@ export async function promptUser(
 ) {
   let answer = "";
   while (!isValidWhen(answer)) {
-    answer = await rl.question(promptText);
-    if (!isValidWhen(answer)) {
-      rl.write(errorText);
+    try {
+      answer = await rl.question(promptText, { signal: aborter.signal });
+      if (!isValidWhen(answer)) {
+        rl.write(errorText);
+      }
+    } catch (err) {
+      return answer;
     }
   }
   return answer;
+}
+
+export function abortPrompt() {
+  aborter.abort();
 }
