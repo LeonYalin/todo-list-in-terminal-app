@@ -8,15 +8,14 @@ import {
   todoText,
   yellowText,
 } from "../utils/colorUtil";
-import { abortPrompt, promptTexts, promptUser } from "../utils/todoUtils";
-import { Server } from "socket.io";
-import { EventType, TodoMsg } from "../types/socketEvents";
+import { abortPrompt, commonTexts } from "../utils/todoUtils";
+import { EventType, TodoMsg } from "../types/socketTypes";
+import { AbstractStrategy } from "./abstractStrategy";
 
-const TODO_CHANNEL = "todo_msg";
 const GO_BACK = "0";
 
-export class TodoManager {
-  private rl: Interface;
+export class TodoListManager {
+  // private rl: Interface;
   private todos: Todo[] = [];
   private selectedTodoId: string = "";
   private welcomeOptions: TodoOption[] = [
@@ -55,37 +54,18 @@ export class TodoManager {
     },
   ];
 
-  constructor(private io: Server) {
-    this.io.on("connection", (socket) => {
-      console.log("a user connected");
+  constructor(private io: AbstractStrategy) {
+    this.io.onConnection(() => {
       this.start();
-
-      socket.on("disconnect", () => {
-        console.log("user disconnected");
-        this.end();
-      });
-
-      socket.on(TODO_CHANNEL, (msg: TodoMsg) => {
-        console.log("server__todo_msg:", msg);
-
-        this.redirectTo(msg);
-      });
     });
 
-    this.rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
+    this.io.onDisconnect(() => {
+      this.io.end();
     });
-  }
 
-  private start() {
-    this.greetingDialog();
-    this.mainMenuDialog();
-  }
-
-  private write(text: string, type: EventType = EventType.UNDEFINED) {
-    this.rl.write(text);
-    this.io.emit(TODO_CHANNEL, { type, text });
+    this.io.onTodoMsg((msg) => {
+      this.redirectTo(msg);
+    });
   }
 
   private redirectTo(msg: TodoMsg) {
@@ -116,37 +96,51 @@ export class TodoManager {
     }
   }
 
-  private exitDialog() {
-    this.write(yellowText("Exiting.. Bye!\n\n"), EventType.BYE);
-    this.end();
+  private start() {
+    this.greetingDialog();
+    this.mainMenuDialog();
   }
 
-  private end() {
-    abortPrompt();
-    this.rl.close();
-    this.rl.removeAllListeners();
+  private exitDialog() {
+    this.io.send({
+      text: yellowText("Exiting.. Bye!\n\n"),
+      type: EventType.BYE,
+    });
+    this.io.end();
   }
+
+  // private end() {
+  //   abortPrompt();
+  //   // this.rl.close();
+  //   // this.rl.removeAllListeners();
+  // }
 
   private greetingDialog() {
-    this.write(
-      `\n${yellowText("Hello")} and welcome to my ${redText(
+    this.io.send({
+      text: `\n${yellowText("Hello")} and welcome to my ${redText(
         "TODO List"
-      )} app!\n\n`
-    );
+      )} app!\n\n`,
+    });
   }
 
   private async mainMenuDialog() {
     this.welcomeOptions.forEach((option, i) => {
-      this.write(`${optionText(option.key, option.text)}\n`);
+      this.io.send({ text: `${optionText(option.key, option.text)}\n` });
     });
-    this.write(promptTexts.ENTER_AN_OPTION, EventType.WELCOME_CHOOSE_OPTION);
+    this.io.send({
+      text: commonTexts.ENTER_AN_OPTION,
+      type: EventType.WELCOME_CHOOSE_OPTION,
+    });
   }
 
   private async welcomeDialogOptionSubmit(answer: string) {
     const answerIsValid = !!this.welcomeOptions.find((wo) => wo.key === answer);
 
     if (!answerIsValid) {
-      this.write(promptTexts.INVALID_OPTION, EventType.WELCOME_CHOOSE_OPTION);
+      this.io.send({
+        text: commonTexts.INVALID_OPTION,
+        type: EventType.WELCOME_CHOOSE_OPTION,
+      });
     } else {
       const chosenOption = this.welcomeOptions.find((wo) => wo.key === answer);
       chosenOption?.handler();
@@ -154,22 +148,22 @@ export class TodoManager {
   }
 
   private async viewAllTodosDialog() {
-    this.write(`${yellowText("\nAvailiable todos:")}\n\n`);
+    this.io.send({ text: `${yellowText("\nAvailiable todos:")}\n\n` });
 
     if (this.todos.length === 0) {
-      this.write("No todos found.\n\n");
+      this.io.send({ text: "No todos found.\n\n" });
     } else {
       this.todos.forEach((todo, index) => {
-        this.write(`${todoText(index + 1, todo)}\n`);
+        this.io.send({ text: `${todoText(index + 1, todo)}\n` });
       });
     }
 
-    this.write(`${optionText(GO_BACK, "Go back")}\n`);
+    this.io.send({ text: `${optionText(GO_BACK, "Go back")}\n` });
 
-    this.write(
-      promptTexts.ENTER_AN_OPTION,
-      EventType.VIEW_ALL_TODOS_CHOOSE_OPTION
-    );
+    this.io.send({
+      text: commonTexts.ENTER_AN_OPTION,
+      type: EventType.VIEW_ALL_TODOS_CHOOSE_OPTION,
+    });
   }
 
   private viewAllTodosSubmit(answer: string) {
@@ -179,10 +173,10 @@ export class TodoManager {
       Number(answer) <= this.todos.length;
 
     if (!answerIsValid) {
-      this.write(
-        promptTexts.INVALID_OPTION,
-        EventType.VIEW_ALL_TODOS_CHOOSE_OPTION
-      );
+      this.io.send({
+        text: commonTexts.INVALID_OPTION,
+        type: EventType.VIEW_ALL_TODOS_CHOOSE_OPTION,
+      });
     } else {
       if (Number(answer) === 0) {
         this.mainMenuDialog();
@@ -195,16 +189,22 @@ export class TodoManager {
   }
 
   private async editTodoDialog() {
-    this.write(
-      `\n${yellowText("Selected:")} ${todoText(null, this.selectedTodo()!)}\n\n`
-    );
-
-    this.editTodoOptions.forEach((option, i) => {
-      this.write(`${optionText(option.key, option.text)}\n`);
+    this.io.send({
+      text: `\n${yellowText("Selected:")} ${todoText(
+        null,
+        this.selectedTodo()!
+      )}\n\n`,
     });
 
-    this.write(`${optionText(GO_BACK, "Go back")}\n`);
-    this.write(promptTexts.ENTER_AN_OPTION, EventType.EDIT_TODO_CHOOSE_OPTION);
+    this.editTodoOptions.forEach((option, i) => {
+      this.io.send({ text: `${optionText(option.key, option.text)}\n` });
+    });
+
+    this.io.send({ text: `${optionText(GO_BACK, "Go back")}\n` });
+    this.io.send({
+      text: commonTexts.ENTER_AN_OPTION,
+      type: EventType.EDIT_TODO_CHOOSE_OPTION,
+    });
   }
 
   private editTodoSubmit(answer: string) {
@@ -214,7 +214,10 @@ export class TodoManager {
         !!this.editTodoOptions.find((wo) => wo.key === answer));
 
     if (!answerIsValid) {
-      this.write(promptTexts.INVALID_OPTION, EventType.EDIT_TODO_CHOOSE_OPTION);
+      this.io.send({
+        text: commonTexts.INVALID_OPTION,
+        type: EventType.EDIT_TODO_CHOOSE_OPTION,
+      });
     } else {
       if (answer === GO_BACK) {
         this.selectedTodoId = "";
@@ -232,19 +235,22 @@ export class TodoManager {
   private async deleteTodoDialog() {
     const todo = this.selectedTodo();
 
-    this.write(
-      `\nAre you sure you want to ${redText("delete")} the "${yellowText(
+    this.io.send({
+      text: `\nAre you sure you want to ${redText("delete")} the "${yellowText(
         todo!.description
       )}"? [y/n]\n\n`,
-      EventType.DELETE_TODO
-    );
+      type: EventType.DELETE_TODO,
+    });
   }
 
   private deleteTodoSubmit(answer: string) {
     const answerIsValid = !!answer.match(/^y|n$/i);
 
     if (!answerIsValid) {
-      this.write(promptTexts.INVALID_OPTION, EventType.DELETE_TODO);
+      this.io.send({
+        text: commonTexts.INVALID_OPTION,
+        type: EventType.DELETE_TODO,
+      });
     } else {
       const todo = this.selectedTodo();
       const shouldDelete = answer.match(/^y$/i);
@@ -256,7 +262,9 @@ export class TodoManager {
           this.todos.splice(index, 1);
           this.selectedTodoId = "";
         }
-        this.write(`\n${greenText("Todo successfully deleted!")}\n\n`);
+        this.io.send({
+          text: `\n${greenText("Todo successfully deleted!")}\n\n`,
+        });
         this.viewAllTodosDialog();
       } else {
         this.editTodoDialog();
@@ -271,19 +279,22 @@ export class TodoManager {
       ? redText("Completed")
       : greenText("Active");
 
-    this.write(
-      `\nAre you sure you want to mark the "${yellowText(
+    this.io.send({
+      text: `\nAre you sure you want to mark the "${yellowText(
         todo!.description
       )} as ${nextCompletedText}"? [y/n]\n\n`,
-      EventType.TOGGLE_TODO_COMPLETED
-    );
+      type: EventType.TOGGLE_TODO_COMPLETED,
+    });
   }
 
   private toggleTodoCompletedSubmit(answer: string) {
     const answerIsValid = !!answer.match(/^y|n$/i);
 
     if (!answerIsValid) {
-      this.write(promptTexts.INVALID_OPTION, EventType.TOGGLE_TODO_COMPLETED);
+      this.io.send({
+        text: commonTexts.INVALID_OPTION,
+        type: EventType.TOGGLE_TODO_COMPLETED,
+      });
     } else {
       const todo = this.selectedTodo();
       const nextCompleted = !todo!.completed;
@@ -299,11 +310,11 @@ export class TodoManager {
         if (index > -1) {
           this.todos[index].completed = nextCompleted;
         }
-        this.write(
-          `\n${greenText(
+        this.io.send({
+          text: `\n${greenText(
             "Todo successfully marked as"
-          )} ${nextCompletedText}!\n\n`
-        );
+          )} ${nextCompletedText}!\n\n`,
+        });
         this.viewAllTodosDialog();
       } else {
         this.editTodoDialog();
@@ -314,20 +325,20 @@ export class TodoManager {
   private async editTodoDescriptionDialog() {
     const todo = this.selectedTodo();
 
-    this.write(
-      `\nEnter the todo description\n\n`,
-      EventType.EDIT_TODO_DESCRIPTION
-    );
+    this.io.send({
+      text: `\nEnter the todo description\n\n`,
+      type: EventType.EDIT_TODO_DESCRIPTION,
+    });
   }
 
   private editTodoDescriptionSubmit(answer: string) {
     const answerIsValid = answer !== "";
 
     if (!answerIsValid) {
-      this.write(
-        "Description should not be empty. Please try again\n",
-        EventType.EDIT_TODO_DESCRIPTION
-      );
+      this.io.send({
+        text: "Description should not be empty. Please try again\n",
+        type: EventType.EDIT_TODO_DESCRIPTION,
+      });
     } else {
       const todo = this.selectedTodo();
       const index = this.todos.findIndex(
@@ -336,29 +347,31 @@ export class TodoManager {
       if (index > -1) {
         this.todos[index].description = answer;
       }
-      this.write(`\n${greenText("Description successfully updated")}\n\n`);
+      this.io.send({
+        text: `\n${greenText("Description successfully updated")}\n\n`,
+      });
       this.viewAllTodosDialog();
     }
   }
 
   private async addTodoDialog() {
-    this.write(
-      `${yellowText("Enter the todo description")}\n`,
-      EventType.ADD_TODO
-    );
+    this.io.send({
+      text: `${yellowText("Enter the todo description")}\n`,
+      type: EventType.ADD_TODO,
+    });
   }
 
   private addTodoSubmit(answer: string) {
     const answerIsValid = answer !== "";
 
     if (!answerIsValid) {
-      this.write(
-        "Description should not be empty. Please try again\n",
-        EventType.ADD_TODO
-      );
+      this.io.send({
+        text: "Description should not be empty. Please try again\n",
+        type: EventType.ADD_TODO,
+      });
     } else {
       this.todos.push(new Todo(answer, false));
-      this.write(greenText("\nTodo successfully added!\n\n"));
+      this.io.send({ text: greenText("\nTodo successfully added!\n\n") });
       this.mainMenuDialog();
     }
   }
@@ -368,6 +381,6 @@ export class TodoManager {
   }
 }
 
-export function newTodoManager(io: Server) {
-  return new TodoManager(io);
+export function newTodoManager(strategy: AbstractStrategy) {
+  return new TodoListManager(strategy);
 }

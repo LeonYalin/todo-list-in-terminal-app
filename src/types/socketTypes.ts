@@ -13,6 +13,6 @@ export enum EventType {
 }
 
 export interface TodoMsg {
-  type: EventType;
   text: string;
+  type?: EventType;
 }
