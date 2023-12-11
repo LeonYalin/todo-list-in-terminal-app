@@ -12,6 +12,5 @@ socket.onTodoMsg(({ type, text }) => {
 });
 
 term.onSubmit((line) => {
-  console.log("onSubmit", { type: currType, text: line });
   socket.sendTodoMsg({ type: currType, text: line });
 });

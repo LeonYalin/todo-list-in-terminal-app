@@ -9,20 +9,17 @@ class WebStrategy extends AbstractStrategy {
     super();
 
     this.io.on("connection", (socket) => {
-      console.log("user connected");
       if (this.connHandler) {
         this.connHandler();
       }
 
       socket.on("disconnect", () => {
-        console.log("user disconnected");
         if (this.disconnHandler) {
           this.disconnHandler();
         }
       });
 
       socket.on(TODO_CHANNEL, (msg: TodoMsg) => {
-        console.log("server__todo_msg:", msg);
         if (this.msgHandler) {
           this.msgHandler(msg);
         }
@@ -31,7 +28,6 @@ class WebStrategy extends AbstractStrategy {
   }
 
   send({ text, type }: TodoMsg) {
-    // this.rl.write(text);
     this.io.emit(TODO_CHANNEL, { type, text: text || EventType.UNDEFINED });
   }
 

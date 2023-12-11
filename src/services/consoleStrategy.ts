@@ -17,7 +17,6 @@ class ConsoleStrategy extends AbstractStrategy {
     });
 
     setTimeout(() => {
-      console.log("console constuctor", this.connHandler);
       if (this.connHandler && typeof this.connHandler === "function") {
         this.connHandler();
       }

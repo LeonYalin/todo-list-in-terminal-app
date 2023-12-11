@@ -24,7 +24,6 @@ export class TodoSocket {
     this.#socket = io();
 
     this.#socket.on("connect", (socket) => {
-      console.log("client connected");
       this.sendTodoMsg("Hello from client");
     });
     this.#socket.on(TODO_CHANNEL, (msg) => {
