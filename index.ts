@@ -15,10 +15,15 @@ import { AbstractStrategy } from "./src/services/abstractStrategy";
 
 const PORT = 3000;
 
-const isConsoleMode = process.env.CONSOLE_MODE;
-const strategy: AbstractStrategy = isConsoleMode
-  ? newConsoleStrategy()
-  : newWebStrategy(io);
+import minimist from "minimist";
+const args = minimist(process.argv.slice(2), {
+  string: ["mode"],
+  alias: { m: "mode" },
+  default: { mode: "web" },
+});
+
+const strategy: AbstractStrategy =
+  args.mode === "console" ? newConsoleStrategy(io) : newWebStrategy(io);
 
 server.listen(PORT, () => {
   console.log(`server runs on port ${PORT}`);

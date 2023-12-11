@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node-dev ./index.ts"
+    "start": "ts-node-dev ./index.ts",
+    "start:console": "npm start -- --m=console"
   },
   "keywords": [],
   "author": "",
@@ -14,10 +15,14 @@
     "@types/node": "^20.10.0",
     "chalk": "^4.1.2",
     "express": "^4.18.2",
+    "minimist": "^1.2.8",
     "socket.io": "^4.7.2",
     "socket.io-client": "^4.7.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.2",
     "xterm": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/minimist": "^1.2.5"
   }
 }

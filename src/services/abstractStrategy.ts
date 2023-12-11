@@ -6,6 +6,7 @@ export abstract class AbstractStrategy {
   protected msgHandler: ((msg: TodoMsg) => void) | null = null;
 
   abstract send(msg: TodoMsg): void;
+  abstract start(): void;
   abstract end(): void;
 
   onConnection(connHandler: () => void) {

@@ -8,14 +8,13 @@ import {
   todoText,
   yellowText,
 } from "../utils/colorUtil";
-import { abortPrompt, commonTexts } from "../utils/todoUtils";
+import { commonTexts } from "../utils/textUtils";
 import { EventType, TodoMsg } from "../types/socketTypes";
 import { AbstractStrategy } from "./abstractStrategy";
 
 const GO_BACK = "0";
 
 export class TodoListManager {
-  // private rl: Interface;
   private todos: Todo[] = [];
   private selectedTodoId: string = "";
   private welcomeOptions: TodoOption[] = [
@@ -108,12 +107,6 @@ export class TodoListManager {
     });
     this.io.end();
   }
-
-  // private end() {
-  //   abortPrompt();
-  //   // this.rl.close();
-  //   // this.rl.removeAllListeners();
-  // }
 
   private greetingDialog() {
     this.io.send({
