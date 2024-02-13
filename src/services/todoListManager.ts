@@ -374,6 +374,6 @@ export class TodoListManager {
   }
 }
 
-export function newTodoManager(strategy: AbstractStrategy) {
+export function NewTodoManager(strategy: AbstractStrategy) {
   return new TodoListManager(strategy);
 }

@@ -2,10 +2,12 @@
   "name": "todo-list-in-terminal-app",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.ts",
   "scripts": {
-    "start": "ts-node-dev ./index.ts",
-    "start:console": "npm start -- --m=console"
+    "start": "ts-node-dev ./src/index.ts",
+    "start:console": "npm start -- --m=console",
+    "serve": "node dist/index.js",
+    "build": "tsc && tscp"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +22,7 @@
     "socket.io-client": "^4.7.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.2",
+    "typescript-cp": "^0.1.9",
     "xterm": "^5.3.0"
   },
   "devDependencies": {
